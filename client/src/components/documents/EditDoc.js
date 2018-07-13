@@ -12,7 +12,7 @@ class EditDoc extends Component {
       console: '',
       files: [],
       index: 0,
-      inputValue: ''
+      inputValue: '',
     };
     this.updateCode = this.updateCode.bind(this);
     this.runCode = this.runCode.bind(this);
@@ -25,7 +25,7 @@ class EditDoc extends Component {
   saveCode() {
     let docId = this.props.location.pathname.slice(9);
     axios
-      .put(`/api/document/${docId}`, { text_content: this.state.code })
+      .put(`/api/document/${docId}`, {docId, files: this.state.files })
       .then(res => {
         console.log('Success', res.data);
       })
@@ -34,42 +34,47 @@ class EditDoc extends Component {
 
   clearConsole() {
     this.setState({
-      console: ''
+      console: '',
     });
   }
 
   updateCode(event) {
     let docId = this.props.location.pathname.slice(9);
     // socket broadcast to others
-    this.socket.emit('edit text', { docId, text: event.target.value });
+    // this.socket.emit('edit text', { docId, text: event.target.value });
 
     // set our own state
     this.state.files[this.state.index].text_content = event.target.value;
     this.setState({
-      files: this.state.files
+      files: this.state.files,
     });
   }
 
   runCode() {
-    console.log('hi begin');
+    const before = `
+      const results = [];
+      function logger(value) {results.push(value);};
+      var console = {}; console.log = logger;
+      const require = (path) => {
+        console.log = () => {};
+        const text = this.state.files.filter(obj => obj.name === path)[0].text_content;
+        let module = {};
+        eval(text)
+        console.log = logger;
+        return module.exports;
+      };
+    `;
 
-    const before =
-      'var results = []; function logger(value) {results.push(value);}; var console = {}; console.log = logger; ';
     const after = '; results';
-    const results = eval(before + this.state.code + after);
-
-    console.log(results);
-    console.log(typeof results);
-    console.log('hi end');
+    const results = eval(before + this.state.files[0].text_content + after);
 
     let consoleText = this.state.console;
     results.forEach(result => {
       consoleText += result;
       consoleText += '\n';
     });
-    console.log(consoleText);
     this.setState({
-      console: consoleText
+      console: consoleText,
     });
   }
   //-------------functionality for CREATE FILE FORM---------------//
@@ -94,11 +99,9 @@ class EditDoc extends Component {
     axios
       .get(`/api/document/${docId}`)
       .then(res => {
-        console.log(res.data[0]);
-        res.data.sort((a, b) => a.id - b.id);
         this.setState({
           init: true,
-          files: res.data
+          files: res.data,
         });
         // const test = [{name: 'hello'}]
 
@@ -109,18 +112,18 @@ class EditDoc extends Component {
         console.log(this.state.files);
 
         // set up sockets
-        this.socket = io();
-        this.socket.on('connect', () => {
-          // emit join doc on connect
-          this.socket.emit('join doc', { docId });
-        });
+        // this.socket = io();
+        // this.socket.on('connect', () => {
+        //   // emit join doc on connect
+        //   this.socket.emit('join doc', { docId });
+        // });
 
-        // receive others' socket text broadcast event
-        this.socket.on('receive text', data => {
-          this.setState({
-            code: data.text
-          });
-        });
+        // // receive others' socket text broadcast event
+        // this.socket.on('receive text', data => {
+        //   this.setState({
+        //     code: data.text
+        //   });
+        // });
       })
       .catch(err => console.log(err));
   }
@@ -129,10 +132,10 @@ class EditDoc extends Component {
 
   componentWillUnmount() {
     // if no socket to close, then return
-    if (!this.socket) return;
+    // if (!this.socket) return;
 
-    let docId = this.props.location.pathname.slice(9);
-    this.socket.emit('leave doc', { docId });
+    // let docId = this.props.location.pathname.slice(9);
+    // this.socket.emit('leave doc', { docId });
   }
 
   render() {
@@ -151,26 +154,23 @@ class EditDoc extends Component {
               value={this.state.inputValue}
               onChange={this.handleChange}
             />
-            <input type="submit" value="Submit" />
-            <button class="nav-link disabled" onClick={this.handleCreateFileCancel}>Cancel</button>
-          </form>
+            <input class="btn" type="submit" value="Submit" />
+            <button class="btn" onClick={this.handleCreateFileCancel}>Cancel</button>
+          </form> <br/><br/>
+
         </div>
-        <div>Your Files</div>
-            <div className="card text-left">
+
+        <div className="displayFiles">Your Files</div>
+            <div className="card-text-left">
               <div className="card-body">
                 {/* <h5 className="card-title">{this.state.docTitle}</h5> */}
                 {this.state.files.map((file, i) => (
-                  <File
-                    key={i}
-                    index={i}
-                    handleFileClick={this.handleFileClick}
-                    name={file.name}
-                  />
+                  <File key={i} index={i} handleFileClick={this.handleFileClick} name={file.name} />
                 ))}
               </div>
             </div>
           </div>
-          <div className="card">
+          <div className="card1">
             <div className="card text-center">
               <div className="card-header">
                 <ul className="nav nav-pills card-header-pills">
@@ -187,9 +187,7 @@ class EditDoc extends Component {
                 </ul>
               </div>
               <div className="card-body">
-                <h5 className="card-title">
-                  {this.state.files[this.state.index].name}
-                </h5>
+                <h5 className="card-title">{this.state.files[this.state.index].name}</h5>
               </div>
             </div>
             <div className="card-body">
@@ -206,15 +204,12 @@ class EditDoc extends Component {
               </div>
             </div>
           </div>
-          <div className="card">
+          <div className="card2">
             <div className="card text-center">
               <div className="card-header">
                 <ul className="nav nav-pills card-header-pills">
                   <li className="nav-item">
-                    <button
-                      onClick={this.clearConsole}
-                      className="nav-link disabled"
-                    >
+                    <button onClick={this.clearConsole} className="nav-link disabled">
                       Clear
                     </button>
                   </li>
@@ -232,15 +227,13 @@ class EditDoc extends Component {
             <div className="card-body">
               <h5 className="card-title">JS</h5>
               <div className="card-text" rows="12">
-                <div className="form-group">
-                  <textarea
-                    className="form-control rounded-0"
-                    style={{ fontFamily: 'monospace' }}
-                    value={this.state.console}
-                    id="ConsoleOutput"
-                    rows="10"
-                  />
-                </div>
+                <textarea
+                  className="form-control rounded-0"
+                  style={{ fontFamily: 'monospace' }}
+                  value={this.state.console}
+                  id="ConsoleOutput"
+                  rows="10"
+                />
               </div>
             </div>
           </div>
