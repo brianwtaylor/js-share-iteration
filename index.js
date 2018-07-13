@@ -24,6 +24,7 @@ app.use(passport.session());
 
 require('./services/googlePassport')(pool);
 require('./services/githubPassport')(pool);
+// require('./services/facebookPassport')(pool);
 
 // create server routes here
 require('./routes/auth')(app);
